@@ -48,6 +48,23 @@ MSPE_lm
 
 ```
 
+## OLS Model with no height/weight
+
+```{r}
+
+
+
+lm_antibody_adj = lm(log_antibody ~ age + gender + race + smoking + bmi + 
+                       diabetes + hypertension + SBP + LDL + time, data = antibody_train)
+summary(lm_antibody_adj)
+
+MSPE_lm_adj_pred = predict(lm_antibody_adj, newdata = antibody_test)
+
+MSPE_lm_adj = mean((MSE_lm_adj_pred - antibody_test$log_antibody)^2)
+MSPE_lm_adj
+
+```
+
 ## LASSO Model
 
 ```{r}
@@ -127,5 +144,24 @@ MSPE_pcr
 
 ```
 
+## PLS Model
+
+```{r}
+
+set.seed(2025)
+
+antibody_pls_fit = train(log_antibody ~ ., 
+                         data = antibody_train,
+                         method = "pls",
+                         tuneGrid = data.frame(ncomp = 1:10),
+                         trControl = ctrl_pcr,
+                         preProcess = c("center", "scale"))
+
+antibody_pls_fit$bestTune
+
+antibody_pls_pred = predict(antibody_pls_fit, newdata = antibody_test |> select(-log_antibody))
+MSPE_pls = mean((antibody_pls_pred - antibody_test$log_antibody)^2)
+MSPE_pls
 
 
+```
