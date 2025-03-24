@@ -61,7 +61,7 @@ antibody_lasso_fit = train(log_antibody ~ .,
                           method = "glmnet",
                           tuneGrid = expand.grid(
                             alpha = 1, 
-                            lambda = exp(seq(6, -10, length = 100))
+                            lambda = exp(seq(6, -6, length = 100))
                           ),
                           trControl = ctrl)
 
@@ -84,7 +84,7 @@ antibody_enet_fit = train(log_antibody ~ .,
                           method = "glmnet",
                           tuneGrid = expand.grid(
                             alpha = seq(0, 0.95, length = 20), 
-                            lambda = exp(seq(6, -10, length = 100))
+                            lambda = exp(seq(6, -6, length = 100))
                           ),
                           trControl = ctrl)
 
@@ -93,6 +93,10 @@ myCol = rainbow(25)
 myPar = list(superpose.symbol = list(col = myCol),
              superpose.line = list(col = myCol))
 plot(antibody_enet_fit, xTrans = log, par.settings = myPar)
+
+antibody_enet_pred = predict(antibody_enet_fit, newdata = antibody_test |> select(-log_antibody))
+MSPE_enet = mean((antibody_enet_pred - antibody_test$log_antibody)^2)
+MSPE_enet
 
 ```
 
