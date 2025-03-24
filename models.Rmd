@@ -7,11 +7,88 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(corrplot)
 ```
+
+## Upload Data (still need a relative path for this)
 
 ```{r}
 
-dat1
+load("./dat1.RData")
+load("./dat2.RData")
+
+```
+
+## Specify Training and Testing Sets
+
+```{r}
+
+antibody_train = dat1
+antibody_test = dat2
+
+antibody_train = antibody_train |> select(-id)
+antibody_test = antibody_test |> select(-id)
+
+```
+
+## Response Variable EDA
+
+### Histogram (looks to be Normal)
+
+```{r}
+
+antibody_train |> 
+  ggplot(aes(x = log_antibody)) + 
+  geom_histogram(color = "black", fill = "lightblue") + 
+  labs(
+    title = "Histogram of log_antibody values",
+    x = "Log-transformed antibody level",
+    y = "Frequency"
+    )
+
+```
+
+### 5-Number Summary
+
+```{r}
+
+antibody_train |>
+  pull(log_antibody) |> 
+  summary()
+
+```
+
+## Predictor EDA
+
+### Visual Correlation Matrix
+
+```{r}
+
+x = model.matrix(log_antibody ~ ., antibody_train)[, -1]
+
+corrplot(cor(x), method = "circle", type = "full")
+
+```
+
+### By-The-Numbers Correlation Matrix
+
+#### Quantitative Variables Only
+
+```{r}
+
+antibody_train |> 
+  select(age, height, weight, bmi, SBP, LDL, time) |>
+  cor() |>
+  round(2)
+
+```
+
+#### Quantitative and Categorical Variables
+
+```{r}
+
+cor(x) |> round(2)
 
 ```
 
