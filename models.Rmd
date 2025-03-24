@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(corrplot)
+library(caret)
+library(glmnet)
 ```
 
 ## Upload Data (still need a relative path for this)
@@ -32,63 +34,68 @@ antibody_test = antibody_test |> select(-id)
 
 ```
 
-## Response Variable EDA
-
-### Histogram (looks to be Normal)
+## OLS Model
 
 ```{r}
 
-antibody_train |> 
-  ggplot(aes(x = log_antibody)) + 
-  geom_histogram(color = "black", fill = "lightblue") + 
-  labs(
-    title = "Histogram of log_antibody values",
-    x = "Log-transformed antibody level",
-    y = "Frequency"
-    )
+lm_antibody = lm(log_antibody ~ ., data = antibody_train)
+summary(lm_antibody)
+
+MSPE_lm_pred = predict(lm_antibody, newdata = antibody_test)
+
+MSPE_lm = mean((MSE_lm_pred - antibody_test$log_antibody)^2)
+MSPE_lm
 
 ```
 
-### 5-Number Summary
+## LASSO Model
 
 ```{r}
 
-antibody_train |>
-  pull(log_antibody) |> 
-  summary()
+set.seed(2025)
+
+ctrl = trainControl(method = "cv", number = 10)
+
+antibody_lasso_fit = train(log_antibody ~ ., 
+                          data = antibody_train,
+                          method = "glmnet",
+                          tuneGrid = expand.grid(
+                            alpha = 1, 
+                            lambda = exp(seq(6, -10, length = 100))
+                          ),
+                          trControl = ctrl)
+
+plot(antibody_lasso_fit, xTrans = log)
+
+antibody_lasso_pred = predict(antibody_lasso_fit, newdata = antibody_test |> select(-log_antibody))
+MSPE_lasso = mean((antibody_lasso_pred - antibody_test$log_antibody)^2)
+MSPE_lasso
 
 ```
 
-## Predictor EDA
-
-### Visual Correlation Matrix
+## Elastic Net Model
 
 ```{r}
 
-x = model.matrix(log_antibody ~ ., antibody_train)[, -1]
+set.seed(2025)
 
-corrplot(cor(x), method = "circle", type = "full")
+antibody_enet_fit = train(log_antibody ~ ., 
+                          data = antibody_train,
+                          method = "glmnet",
+                          tuneGrid = expand.grid(
+                            alpha = seq(0, 0.95, length = 20), 
+                            lambda = exp(seq(6, -10, length = 100))
+                          ),
+                          trControl = ctrl)
 
-```
 
-### By-The-Numbers Correlation Matrix
-
-#### Quantitative Variables Only
-
-```{r}
-
-antibody_train |> 
-  select(age, height, weight, bmi, SBP, LDL, time) |>
-  cor() |>
-  round(2)
-
-```
-
-#### Quantitative and Categorical Variables
-
-```{r}
-
-cor(x) |> round(2)
+myCol = rainbow(25)
+myPar = list(superpose.symbol = list(col = myCol),
+             superpose.line = list(col = myCol))
+plot(antibody_enet_fit, xTrans = log, par.settings = myPar)
 
 ```
+
+
+
 
