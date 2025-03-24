@@ -100,6 +100,32 @@ MSPE_enet
 
 ```
 
+## PCR
+
+```{r}
+
+set.seed(2025)
+
+ctrl_pcr = trainControl(method = "repeatedcv",
+                        number = 10,
+                        repeats = 5,
+                        selectionFunction = "best")
+
+antibody_pcr_fit = train(log_antibody ~ ., 
+                         data = antibody_train,
+                         method = "pcr",
+                         tuneGrid = data.frame(ncomp = 1:10),
+                         trControl = ctrl_pcr,
+                         preProcess = c("center", "scale"))
+
+antibody_pcr_fit$bestTune
+
+antibody_pcr_pred = predict(antibody_pcr_fit, newdata = antibody_test |> select(-log_antibody))
+MSPE_pcr = mean((antibody_pcr_pred - antibody_test$log_antibody)^2)
+MSPE_pcr
+
+
+```
 
 
 
