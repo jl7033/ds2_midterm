@@ -48,7 +48,7 @@ set.seed(56)
 
 Check the distribution of the response variable. For linear regression this needs to be normally distributed. Explore transformations such as log if it is not normally distributed. If using a generalized linear model the response variable doesn't necessarily need to be normally distributed.
 
-```{r}
+```{r Plot Distribution}
 train_df |>
   ggplot(aes(x = log_antibody)) +
   geom_histogram() +
@@ -56,7 +56,7 @@ train_df |>
 ```
 Check if there are any highly correlated predictors included. If there are, these should be watched throughout the model building processed and make sure only the most significant are removed.
 
-```{r}
+```{r Evaluate Correlation}
 # matrix of predictors
 x = model.matrix(log_antibody ~ ., train_df) [,-1]
 
@@ -71,19 +71,35 @@ Using the caret package, we can use the basic formula below, and change the `met
 
 ## Cross Validation
 
-Before we actually start building the model we need to make sure we are doing cross validation. Use the `trainControl` function from caret to set up how we do cross validation.Below we set up a cross validation parameter with k=11 folds.
+Before we actually start building the model we need to make sure we are doing cross validation. Use the `trainControl` function from caret to set up how we do cross validation.Below we set up a cross validation parameter with k=10 folds.
 
-```{r}
+```{r CV}
+# k-fold cv
 ctrl1 = trainControl(method = "cv", number = 10)
 
 # if you want to use the 1se rule
-ctrl_1se = trainControl(method = "1se", number = 10)
+ctrl_1se = trainControl(method = "cv", number = 10, selectionFunction = "oneSE")
+
+# leave-one-out CV
+ctrl_2 = trainControl(method = "LOOCV")
+
+# leave-group-out / Monte Carlo CV
+ctrl_3 = trainControl(method = "LGOCV", p = 0.75, number = 50)
+
+# bootstrap
+ctrl_4 = trainControl(method = "boot632", number = 100)
+
+# repeated K-fold CV
+ctrl_5 = trainControl(method = "repeatedcv", repeats = 5, number = 10)
+
+# only fit one model to the entire training set
+ctrl_6 = trainControl(method = "none")
 ```
 
 ## Train the Model
 
-Train the model using caret's `train` function and the `ctrl1` traiing parameters. For OLS use method "lm".
-```{r}
+Train the model using caret's `train` function and the `ctrl1` training parameters. For OLS use method "lm".
+```{r OLS}
 set.seed(56)
 lm_fit = train(log_antibody ~ .,
                data = train_df,
@@ -96,10 +112,119 @@ summary(lm_fit)
 
 Get the prediction error using predictions from the model and the actual response value from the test data. Take the mean squared error "MSE" to report the test error.
 
-```{r}
+```{r Test Error}
 MSPE_lm_pred = predict(lm_fit, newdata = test_df)
 
 MSPE_lm = mean((MSPE_lm_pred - test_df$log_antibody)^2)
 MSPE_lm
 ```
+# Linear Models with Regularization
+
+### Ridge Model
+
+Ridge models have type 1 pentaly terms that will shrink the coefficients of highly correlated predictors, but not eliminate them from the model. To build a ridge model we set alpha to 0 and create a grid for lambda values that determine how large the penalty term can be.
+
+```{r Ridge}
+set.seed(56)
+ridge_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "glmnet",
+               trControl = ctrl1,
+               tuneGrid = expand.grid(alpha = 0, # for ridge specifically
+                                      lambda = exp(seq(-10,0, length = 100)))) # create gride for 100 different lambda values between -10, 0
+
+# find the lambda value with lowest RMSE
+plot(ridge_fit, xTrans = log)
+ridge_fit$bestTune$lambda
+```
+### Lasso Model
+
+Lasso models use type 2 penalty terms that ends up shrinking correlated or insignificant predictors to zero and remove them from the model. We use an alpha value of 0 instead of 1 to train the model as Lasso.
+
+```{r Lasso}
+set.seed(56)
+lasso_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "glmnet",
+               trControl = ctrl1,
+               tuneGrid = expand.grid(alpha = 1, # for Lasso specifically
+                                      lambda = exp(seq(-10,0, length = 100)))) # create gride for 100 different lambda values between -10, 0
+
+# find the lambda value with lowest RMSE
+plot(lasso_fit, xTrans = log)
+lasso_fit$bestTune$lambda
+```
+### Elastic Net
+
+Elastic Net models use a mixture of lasso and ridge penalty terms. We create a grid of alpha values to determine the best mixture of models.
+
+```{r}
+set.seed(56)
+enet_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "glmnet",
+               trControl = ctrl1,
+               tuneGrid = expand.grid(alpha = seq(0,1, length = 21), # create a model for each alpha value with 0.5 spacing
+                                      lambda = exp(seq(-10,0, length = 100)))) # create gride for 100 different lambda values between -10, 0
+
+# find the lambda value with lowest RMSE
+myCol = rainbow(25)
+myPar = list(superpose.symbol = list(col = myCol),
+             superpose.line = list(col = myCol))
+
+plot(enet_fit, par.settings = myPar, xTrans = log)
+enet_fit$bestTune$lambda
+```
+# Dimension Reduction Methods
+
+### Principal Components Regression (PCR)
+
+PCR performs a principal component analysis on the predictors to reduce the dimensionality of the data. It then regresses the response variable on the principal components (PCs) instead of the original predictors. This type of model can work well with data that is highly correlated. This method is unsupervised and doesn't consider the response variable when selecting components.
+
+We need to specify the number of components for the model to consider. We use the number of predictors in the model matrix without the response variable. The data must be centered and scaled so that the components are weighed equally.
+
+```{r}
+# get number of components to include
+ncol(x) # x is model matrix of predictors
+
+# Build PCR model
+pcr_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "pcr",
+               trControl = ctrl1,
+               tuneLength = 15,
+               preProcess = c("center", "scale")) 
+```
+
+### Partial Least Square Regression (PLS)
+
+PLS is similar to PCR, but it is a supervised approach. It finds components that explain both the predictor variance and the response correlation. It is more likely to retain predictive signal than PCR, but can overfit if too many components are used.
+
+```{r}
+pls_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "pls",
+               trControl = ctrl1,
+               tuneLength = 15,
+               preProcess = c("center", "scale")) 
+```
+
+
+# Comparing Different Models
+
+```{r}
+resamp = resamples(list(
+  lm = lm_fit,
+  enet = enet_fit,
+  lasso = lasso_fit,
+  ridge = ridge_fit,
+  pcr = pcr_fit,
+  pls = pls_fit
+))
+
+parallelplot(resamp, metric = "RMSE")
+
+bwplot(resamp, metric = "RMSE")
+```
+# Nonlinear methods
 
