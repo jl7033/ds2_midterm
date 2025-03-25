@@ -5,7 +5,101 @@ date: "2025-03-25"
 output: html_document
 ---
 
-```{r setup}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(corrplot)
+library(caret)
+library(glmnet)
+```
+
+# Loading Data and Exploratory Data Analysis
+
+When building models it is important to start with tidy data, removing any columns that won't be used as predictors (i.e "ID"). Make sure that categorical variables are read in as factors. 
+
+## Upload Data (still need a relative path for this)
+
+```{r}
+load("./dat1.RData")
+load("./dat2.RData")
+```
+
+## Specify Training and Testing Sets
+
+When building a model we must partition the data into two sets: training and testing. All of the model building procedures will be done based on the training dataset including parameter optimization and model selection. Only the final model will be tested using the testing dataset to evaluate the performance and generalizability of the model. Generally, a data split will occur with 80% of the original data in the training set and the other 20% in the testing dataset.
+
+```{r}
+train_df = dat1 |> select(-id)
+test_df = dat2 |> select(-id)
+```
+
+The data above has already been split, but we can use the caret package??? to create our partition.Always set a seed when doing this to control the randomness. Use this same seed for training all of the models.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(56)
+#using dat 1 as example data as if it is the only data we obtained
+
+#datSplit = initial_split(data = dat1, prop = 0.8)
+#trainData = training(datSplit)
+#testData = testing(datSplit)
+```
+
+## Exploratory Data Analysis
+
+Check the distribution of the response variable. For linear regression this needs to be normally distributed. Explore transformations such as log if it is not normally distributed. If using a generalized linear model the response variable doesn't necessarily need to be normally distributed.
+
+```{r}
+train_df |>
+  ggplot(aes(x = log_antibody)) +
+  geom_histogram() +
+  ggtitle("Distribution of Response Variable")
+```
+Check if there are any highly correlated predictors included. If there are, these should be watched throughout the model building processed and make sure only the most significant are removed.
+
+```{r}
+# matrix of predictors
+x = model.matrix(log_antibody ~ ., train_df) [,-1]
+
+# correlation plot
+corrplot(cor(x), method = "circle", type = "full")
+```
+We see that height, weight, and BMI have slight correlation which makes sense, we probably don't want all of these to be included in the final model. Systolic blood pressure (SBP) and hypertentsion are also correlated because hypertension means there is high SBP. 
+
+# Model Building Process
+
+Using the caret package, we can use the basic formula below, and change the `method` and some parameters for the type of model that we want to build. For this part we will use the simple linear model built using Ordinary Least Squares (OLS).
+
+## Cross Validation
+
+Before we actually start building the model we need to make sure we are doing cross validation. Use the `trainControl` function from caret to set up how we do cross validation.Below we set up a cross validation parameter with k=11 folds.
+
+```{r}
+ctrl1 = trainControl(method = "cv", number = 10)
+
+# if you want to use the 1se rule
+ctrl_1se = trainControl(method = "1se", number = 10)
+```
+
+## Train the Model
+
+Train the model using caret's `train` function and the `ctrl1` traiing parameters. For OLS use method "lm".
+```{r}
+set.seed(56)
+lm_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "lm",
+               trControl = ctrl1)
+  
+# get the coefficients
+summary(lm_fit)
+```
+
+Get the prediction error using predictions from the model and the actual response value from the test data. Take the mean squared error "MSE" to report the test error.
+
+```{r}
+MSPE_lm_pred = predict(lm_fit, newdata = test_df)
+
+MSPE_lm = mean((MSPE_lm_pred - test_df$log_antibody)^2)
+MSPE_lm
 ```
 
