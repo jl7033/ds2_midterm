@@ -11,6 +11,7 @@ library(tidyverse)
 library(corrplot)
 library(caret)
 library(glmnet)
+library(splines)
 ```
 
 # Loading Data and Exploratory Data Analysis
@@ -227,4 +228,96 @@ parallelplot(resamp, metric = "RMSE")
 bwplot(resamp, metric = "RMSE")
 ```
 # Nonlinear methods
+
+We need to split the data to x and y to easily use the nonlinear methods
+
+```{r}
+x = model.matrix(log_antibody ~ ., train_df) [,-1]
+
+y = train_df$log_antibody
+```
+
+## Univarite Models
+
+### Polynomial Regression
+
+Polynomial regression models fit the data with the addition of squared and cubed predictor terms as well as interactions. These models can help fit the complexity of the data, but are notoriously bad for prediction outside of the observation range.
+
+We can test what order polynomial is best.
+
+```{r}
+poly_fit1 = lm(log_antibody ~ SBP,
+              data = train_df)
+poly_fit2 = lm(log_antibody ~ poly(SBP, 2),
+              data = train_df)
+poly_fit3 = lm(log_antibody ~ poly(SBP, 3),
+              data = train_df)
+poly_fit4 = lm(log_antibody ~ poly(SBP, 4),
+              data = train_df)
+
+anova(poly_fit1, poly_fit2, poly_fit3, poly_fit4)
+```
+We can also test whether the polynomial terms are better for multiple predictors.
+
+```{r}
+# Compare linear vs. quadratic for multiple predictors
+lm_linear <- lm(log_antibody ~ SBP + age, data = train_df)
+lm_quad   <- lm(log_antibody ~ poly(SBP, 2) + poly(age, 2), data = train_df)
+
+anova(lm_linear, lm_quad)  # Does adding quadratic terms help?
+```
+### Step Function
+
+Using a step function model will create cuts in the data and fit models separately.It creates dummy variables for each region where the data is cut. You must add all the predictors individually and choose separately for each.
+
+```{r}
+step_fit = train(log_antibody ~ cut(SBP, 4),
+              data = train_df,
+              method = "lm")
+```
+
+### Cubic Splines
+
+Cubic Splines fits a cubic polynomial piece wise model that has smooth transitions at the knots.
+
+```{r}
+cs_fit1 = train(log_antibody ~ bs(SBP, df = 4), # specify 4 knots
+              data = train_df,
+              method = "lm")
+
+cs_fit2 = train(log_antibody ~ bs(SBP, knots = c(110, 120,130,140,150)), # specify values for knots
+              data = train_df,
+              method = "lm")
+```
+
+### Natural Cubic Splines
+
+### Smoothing splines
+
+## GAM/MARS
+
+### Generalized Additive Models
+
+```{r}
+gam_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "gam",
+               trControl = ctrl1)
+summary(gam_fit)
+```
+
+
+### Multivariate Additive Regression 
+
+```{r}
+set.seed(56)
+
+mars_grid <- expand.grid(degree = 1:3,nprune = 2:15)
+
+mars_fit = train(log_antibody ~ .,
+               data = train_df,
+               method = "earth",
+               trControl = ctrl1)
+ggplot(mars_fit)
+```
 
