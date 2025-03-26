@@ -90,3 +90,14 @@ cor(x) |> round(2)
 
 ```
 
+### Scatterplot Matrix of Quant. Variables with Predictors
+
+```{r}
+
+antibody_train |>
+  select(log_antibody, age, height, weight, bmi, SBP, LDL, time) |>
+  pairs()
+  
+
+```
+

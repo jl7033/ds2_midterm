@@ -52,26 +52,27 @@ MSPE_lm
 
 ```{r}
 
-
-
 lm_antibody_adj = lm(log_antibody ~ age + gender + race + smoking + bmi + 
                        diabetes + hypertension + SBP + LDL + time, data = antibody_train)
 summary(lm_antibody_adj)
 
 MSPE_lm_adj_pred = predict(lm_antibody_adj, newdata = antibody_test)
 
-MSPE_lm_adj = mean((MSE_lm_adj_pred - antibody_test$log_antibody)^2)
+MSPE_lm_adj = mean((MSPE_lm_adj_pred - antibody_test$log_antibody)^2)
 MSPE_lm_adj
 
 ```
 
 ## LASSO Model
 
+### Using lambda_min
+
 ```{r}
 
 set.seed(2025)
 
 ctrl = trainControl(method = "cv", number = 10)
+ctrl_1se = trainControl(method = "cv", number = 10, selectionFunction = "oneSE")
 
 antibody_lasso_fit = train(log_antibody ~ ., 
                           data = antibody_train,
@@ -89,6 +90,8 @@ MSPE_lasso = mean((antibody_lasso_pred - antibody_test$log_antibody)^2)
 MSPE_lasso
 
 ```
+
+### Using lambda_1se
 
 ## Elastic Net Model
 
