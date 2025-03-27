@@ -30,8 +30,8 @@ load("./dat2.RData")
 When building a model we must partition the data into two sets: training and testing. All of the model building procedures will be done based on the training dataset including parameter optimization and model selection. Only the final model will be tested using the testing dataset to evaluate the performance and generalizability of the model. Generally, a data split will occur with 80% of the original data in the training set and the other 20% in the testing dataset.
 
 ```{r}
-train_df = dat1 |> select(-id)
-test_df = dat2 |> select(-id)
+train_df = dat1 |> dplyr::select(-id)
+test_df = dat2 |> dplyr::select(-id)
 ```
 
 The data above has already been split, but we can use the caret package??? to create our partition.Always set a seed when doing this to control the randomness. Use this same seed for training all of the models.
