@@ -1,0 +1,149 @@
+---
+title: "malika_code"
+author: "Malika Top"
+date: "2025-03-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+library(glmnet)
+library(caret)
+library(pls)
+library(tidymodels)
+library(corrplot)
+library(ggplot2)
+library(plotmo)
+library(ggrepel)
+library(dplyr)
+library(pdp)
+library(patchwork)
+library(gtsummary)
+```
+
+
+
+# Loading and splitting the data
+```{r}
+load("./dat1.RData")
+load("./dat2.RData")
+dat1split = initial_split(data = dat1, prop = 0.8) 
+train_dat1 = training(dat1split)
+test_dat1 = testing(dat1split)
+
+train_dat1 = train_dat1 |> 
+  dplyr::select(-id) |> 
+  mutate(gender = factor(gender, levels = c(0, 1), labels = c("female", "male")),
+         race = factor(race, levels = c(1, 2, 3, 4), labels = c("white", "asian", 
+                                                                "black", "hispanic")),
+         smoking = factor(smoking, levels = c(0, 1, 2), labels = c("never smoked",
+                                                                   "former smoker",
+                                                                   "current smoker")),
+         diabetes = factor(diabetes, levels = c(0, 1), labels = c("no", "yes")),
+         hypertension = factor(hypertension, levels = c(0, 1), labels = c("no", "yes")))
+test_dat1 = test_dat1 |> 
+  dplyr::select(-id) |> 
+  mutate(gender = factor(gender, levels = c(0, 1), labels = c("female", "male")),
+         race = factor(race, levels = c(1, 2, 3, 4), labels = c("white", "asian", 
+                                                                "black", "hispanic")),
+         smoking = factor(smoking, levels = c(0, 1, 2), labels = c("never smoked",
+                                                                   "former smoker",
+                                                                   "current smoker")),
+         diabetes = factor(diabetes, levels = c(0, 1), labels = c("no", "yes")),
+         hypertension = factor(hypertension, levels = c(0, 1), labels = c("no", "yes")))
+
+train_x = model.matrix(log_antibody ~ ., train_dat1)[,-1]
+train_y = train_dat1$log_antibody
+test_x = model.matrix(log_antibody~ ., test_dat1)[, -1]
+test_y = test_dat1$log_antibody
+
+dat2 = dat2 |> 
+  dplyr::select(-id)
+```
+
+#### Cross-validation
+```{r}
+ctrl1 = trainControl(method = "cv", number = 10)
+```
+
+#### Elastic net
+```{r}
+set.seed(2025)
+
+antibody_enet_fit = train(log_antibody ~ ., 
+                          data = train_dat1,
+                          method = "glmnet",
+                          tuneGrid = expand.grid(
+                            alpha = seq(0, 1, length = 20), 
+                            lambda = exp(seq(6, -6, length = 100))
+                          ),
+                          trControl = ctrl1)
+antibody_enet_fit$bestTune$alpha # = 0.05263158
+antibody_enet_fit$bestTune$lambda # = 0.002478752
+
+myCol = rainbow(25)
+myPar = list(superpose.symbol = list(col = myCol),
+             superpose.line = list(col = myCol))
+plot(antibody_enet_fit, xTrans = log, par.settings = myPar)
+
+# TEST RMSE
+enet_pred = predict(antibody_enet_fit, newdata = test_dat1)
+enet_rmse = sqrt(mean((enet_pred - test_dat1$log_antibody)^2)) # = 0.55185
+```
+
+#### MARS
+
+```{r}
+set.seed(2025)
+mars_grid = expand.grid(degree = 1:3,nprune = 2:20)
+mars_fit = train(log_antibody ~., data = train_dat1, method = "earth", tuneGrid = mars_grid, trControl = ctrl1)
+ggplot(mars_fit)
+
+mars_fit$bestTune
+coef(mars_fit$finalModel) # output tells direction of the hinge function
+
+# TEST RMSE
+obs_y = test_dat1$log_antibody
+test_pred_y = predict(mars_fit, newdata = test_dat1) 
+test_rmse_mars = sqrt(mean((obs_y - test_pred_y)^2))
+test_rmse_mars
+```
+
+#### GAM
+```{r}
+set.seed(2025)
+gam_fit = train(log_antibody~., data = train_dat1,  method = "gam", 
+                 # tuneGrid = data.frame(method = "GCV.Cp", select = c(TRUE,FALSE)),
+trControl = ctrl1)
+```
+
+
+
+
+
+
+
+
+
+
+
+#### GAM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

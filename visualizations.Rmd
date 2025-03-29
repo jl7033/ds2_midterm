@@ -1,0 +1,213 @@
+---
+title: "midterm_report"
+author: "Joe LaRocca, Brooklynn McNeil, Malika Top"
+date: "2025-03-31"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ISLR)
+library(glmnet)
+library(caret)
+library(pls)
+library(tidymodels)
+library(corrplot)
+library(ggplot2)
+library(plotmo)
+library(ggrepel)
+library(dplyr)
+library(pdp)
+library(patchwork)
+```
+
+
+# 1. Exploratory Analysis
+The aim of this project is to build a prediction model of antibody levels, seeing which demographic and clinical factors influence antibody responses and how antibody levels change over time following vaccination.
+
+
+
+#### Loading and splitting data
+```{r}
+load("./dat1.RData")
+load("./dat2.RData")
+# split dat1 into a train and test dataset
+dat1split = initial_split(data = dat1, prop = 0.8) 
+train_dat1 = training(dat1split)
+test_dat1 = testing(dat1split)
+
+train_dat1 = train_dat1 |> 
+  dplyr::select(-id) |> 
+  mutate(gender = factor(gender, levels = c(0, 1), labels = c("female", "male")),
+         race = factor(race, levels = c(1, 2, 3, 4), labels = c("white", "asian", 
+                                                                "black", "hispanic")),
+         smoking = factor(smoking, levels = c(0, 1, 2), labels = c("never smoked",
+                                                                   "former smoker",
+                                                                   "current smoker")),
+         diabetes = factor(diabetes, levels = c(0, 1), labels = c("no", "yes")),
+         hypertension = factor(hypertension, levels = c(0, 1), labels = c("no", "yes")))
+test_dat1 = test_dat1 |> 
+  dplyr::select(-id) |> 
+  mutate(gender = factor(gender, levels = c(0, 1), labels = c("female", "male")),
+         race = factor(race, levels = c(1, 2, 3, 4), labels = c("white", "asian", 
+                                                                "black", "hispanic")),
+         smoking = factor(smoking, levels = c(0, 1, 2), labels = c("never smoked",
+                                                                   "former smoker",
+                                                                   "current smoker")),
+         diabetes = factor(diabetes, levels = c(0, 1), labels = c("no", "yes")),
+         hypertension = factor(hypertension, levels = c(0, 1), labels = c("no", "yes")))
+
+# keep dat2 untouched for robustness/generalizability purposes later
+
+```
+#### Response variable distribution
+```{r}
+train_dat1 |>
+  ggplot(aes(x = log_antibody)) +
+  geom_histogram() +
+  ggtitle("Distribution of log-transformed antibody levels") +
+  labs(tag = "Fig. 1", caption = "The distribution of the response variable is normal so no transformations need to be applied." ) 
+```
+#### Predictor variable distributions
+
+There are 12 predictor variables in total, 5 that are categorical (gender, race, smoking, diabetes, and hypertension) and 7 that are continuous (age, height, weight, BMI, SBP, LDL). For the categorical predictors, we can visualize the distributions using bar charts, and for continuous predictors using histograms.
+
+```{r}
+# gender, race, smoking, diabetes, and hypertension
+cat_pred = c("gender", "race", "smoking", "diabetes", "hypertension")
+gender_bar = train_dat1 |> 
+  ggplot(aes(x = gender, fill = gender)) +
+  geom_bar() +
+  labs(title = "Distribution of gender")
+```
+
+
+```{r}
+#age, height, weight, BMI, SBP, LDL
+cont_pred = c("age", "height", "weight", "BMI", "SBP", "LDL")
+age_hist = train_dat1 |> 
+  ggplot(aes(x = age)) +
+  geom_histogram() +
+  labs(title = "Distribution of age")
+height_hist = train_dat1 |> 
+  ggplot(aes(x = height)) +
+  geom_histogram() +
+  labs(title = "Distribution of height")
+weight_hist = train_dat1 |> 
+  ggplot(aes(x = weight)) +
+  geom_histogram() +
+  labs(title = "Distribution of weight")
+bmi_hist = train_dat1 |> 
+  ggplot(aes(x = bmi)) +
+  geom_histogram() +
+  labs(title = "Distribution of BMI")
+sbp_hist = train_dat1 |> 
+  ggplot(aes(x = SBP)) +
+  geom_histogram() +
+  labs(title = "Distribution of SBP")
+ldl_hist = train_dat1 |> 
+  ggplot(aes(x = LDL)) +
+  geom_histogram() +
+  labs(title = "Distribution of LDL")
+```
+
+
+#### Visualizing relationship between predictor-response variables
+For visualizing the relationship between the predictor and response variables, we can make boxplots for the categorical variables, and scatterplots for the continuous. 
+```{r}
+gender_box = train_dat1 |> 
+  ggplot(aes(x = gender, y = log_antibody, fill = gender)) +
+  geom_boxplot() +
+  labs(title = "Distribution of log-antibody levels by gender")
+race_box = train_dat1 |> 
+  ggplot(aes(x = race, y = log_antibody, fill = race)) +
+  geom_boxplot() +
+  labs(title = "Distribution of log-antibody levels by race")
+smoking_box = train_dat1 |> 
+  ggplot(aes(x = smoking, y = log_antibody, fill = smoking)) +
+  geom_boxplot() +
+  labs(title = "Distribution of log-antibody levels by smoking status")
+diabetes_box = train_dat1 |> 
+  ggplot(aes(x = diabetes, y = log_antibody, fill = diabetes)) +
+  geom_boxplot() +
+  labs(title = "Distribution of log-antibody levels by diabetes status")
+hypertension_box = train_dat1 |> 
+  ggplot(aes(x = hypertension, y = log_antibody, fill = hypertension)) +
+  geom_boxplot() +
+  labs(title = "Distribution of log-antibody levels by hypertension status")
+(gender_box | race_box | smoking_box) /
+      (diabetes_box | hypertension_box)
+```
+
+```{r}
+cont_pred = c("age", "height", "weight", "bmi", "SBP", "LDL", "time")
+scatter_plots = list()
+for (pred in cont_pred) {
+  plot = train_dat1 |> 
+  ggplot(aes(x = !!sym(pred), y = log_antibody)) +
+  geom_point() +
+  geom_smooth() 
+  scatter_plots[[pred]] = plot
+}
+wrap_plots(scatter_plots)
+age_scatter = train_dat1 |> 
+  ggplot(aes(x = age, y = log_antibody)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Relationship of age and log-antibody levels") 
+height_scatter = train_dat1 |> 
+  ggplot(aes(x = height, y = log_antibody)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Relationship of height and log-antibody levels") 
+weight_scatter = train_dat1 |> 
+  ggplot(aes(x = weight, y = log_antibody)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Relationship of weight and log-antibody levels") 
+bmi_scatter = train_dat1 |> 
+  ggplot(aes(x = bmi, y = log_antibody)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Relationship of BMI and log-antibody levels") 
+sbp_scatter = train_dat1 |> 
+  ggplot(aes(x = sbp, y = log_antibody)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Relationship of SBP and log-antibody levels") 
+ldl_scatter = train_dat1 |> 
+  ggplot(aes(x = ldl, y = log_antibody)) +
+  geom_point() +
+  geom_smooth() +
+  labs(title = "Relationship of LDL and log-antibody levels") 
+```
+There appear to be some non-linear relationships between BMI, time, and the log-antibody levels.  
+
+#### Checking for correlation between predictors
+```{r}
+x = model.matrix(log_antibody ~ ., train_dat1)[,-1]
+y = train_dat1$log_antibody
+```
+
+# 2. Model training
+```{r}
+
+```
+
+# 3. Results
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
