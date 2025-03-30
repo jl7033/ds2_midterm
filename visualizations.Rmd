@@ -251,3 +251,15 @@ parallelplot(resamp, metric = "RMSE")
 
 bwplot(resamp, metric = "RMSE", main = "Figure 10: Comparing CV RMSEs") 
 ```
+
+#### Test RMSE
+
+```{r}
+
+MSPE_mars_pred = predict(mars_fit, newdata = test_df)
+MSPE_mars = mean((MSPE_mars_pred - test_df$log_antibody)^2)
+RMSPE_mars = sqrt(MSPE_mars)
+RMSPE_mars
+
+```
+
