@@ -83,15 +83,34 @@ outcome_table|> as_flex_table()
 ```
 
 ```{r response_dist}
+
+pdf(
+  here::here("Figures/figure_1.pdf"),
+  width = 10,
+  height = 7
+  )
+
 # Fig. 1
 dat1 |>
   ggplot(aes(x = log_antibody)) +
   geom_histogram() +
   ggtitle("Distribution of log-transformed antibody levels") +
-  labs(tag = "Fig. 1", caption = "The distribution of the response variable is normal so no transformations need to be applied." ) 
+  labs(caption = "The distribution of the response variable is Normal so no transformations need to be applied." ,
+       x = "Log Antibody Levels",
+       y = "Frequency") 
+
+dev.off()
+
 ```
 
 ```{r pred_dist}
+
+pdf(
+  here::here("Figures/figure_2.pdf"),
+  width = 10,
+  height = 7
+  )
+
 # Fig. 2
 barplots = list()
 for (pred in cat_pred) {
@@ -103,11 +122,21 @@ for (pred in cat_pred) {
         axis.text=element_text(size=8))
   barplots[[pred]] = plot
 }
+
 wrap_plots(barplots) + plot_annotation(title = "Figure 2")
+
+dev.off()
 ```
 
 
 ```{r histograms}
+
+pdf(
+  here::here("Figures/figure_3.pdf"),
+  width = 10,
+  height = 7
+  )
+
 # Fig. 3
 histograms = list()
 for (pred in cont_pred) {
@@ -119,12 +148,23 @@ for (pred in cont_pred) {
         axis.text=element_text(size=8))
   histograms[[pred]] = plot
 }
-wrap_plots(histograms) + plot_annotation(title = "Figure 3")
+
+wrap_plots(histograms) 
+
+dev.off()
+
 ```
  
 
 
 ```{r boxplots}
+
+pdf(
+  here::here("Figures/figure_4.pdf"),
+  width = 10,
+  height = 7
+  )
+
 # Fig. 4
 boxplots = list()
 for (pred in cat_pred) {
@@ -135,32 +175,53 @@ for (pred in cat_pred) {
         axis.text=element_text(size=8))
   boxplots[[pred]] = plot
 }
-wrap_plots(boxplots) + plot_annotation(title = "Figure 4: Distribution of log-antibody levels by predictor")
+wrap_plots(boxplots) 
+
+dev.off()
 ```
 
 ```{r scatterplots}
+
+pdf(
+  here::here("Figures/figure_5.pdf"),
+  width = 10,
+  height = 7
+  )
+
 # Fig. 5
 scatter_plots = list()
 for (pred in cont_pred) {
   plot = ggplot(dat1, aes(x = .data[[pred]], y = log_antibody)) +
   geom_point() +
   geom_smooth() +
+  labs(y = "Log Antibody Levels") + 
   theme(plot.title = element_text(size = 10, hjust = 0.5),
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
         axis.text=element_text(size=8))
   scatter_plots[[pred]] = plot
 }
-wrap_plots(scatter_plots) + plot_annotation(title = "Figure 5: Relationship of log-antibody levels by predictor")
+wrap_plots(scatter_plots) 
+
+dev.off()
+
 ```
 
 ```{r corrplots, fig.width=6, fig.height=6}
+
+pdf(
+  here::here("Figures/figure_6.pdf"),
+  width = 10,
+  height = 7
+  )
+
 # Fig. 6
 x = model.matrix(log_antibody ~ ., dat1)[,-1]
 y = dat1$log_antibody
-corrplot::corrplot(cor(x), method = "circle", type = "full", main = "Figure 6")
+corrplot::corrplot(cor(x), method = "circle", type = "full")
+
+dev.off()
+
 ```
-
-
 
 
 #### Elastic Net
@@ -212,7 +273,14 @@ gam_fit$finalModel
 
 #### MARS
 ```{r mars}
-set.seed(2025)
+
+pdf(
+  here::here("Figures/figure_7.pdf"),
+  width = 10,
+  height = 7
+  )
+
+set.seed(56)
 
 mars_grid <- expand.grid(degree = 1:3,nprune = 2:15)
 
@@ -221,11 +289,14 @@ mars_fit = train(log_antibody ~ .,
                method = "earth",
                tuneGrid = mars_grid,
                trControl = ctrl1)
-ggplot(mars_fit) + ggtitle("Figure 9")
+ggplot(mars_fit) 
+
+dev.off()
+
 ```
 #### Linear regression
 ```{r ols}
-set.seed(2025)
+set.seed(56)
 lm_fit = train(log_antibody ~ .,
                data = train_df,
                method = "lm",
@@ -238,7 +309,37 @@ summary(lm_fit)
 #### CV RMSEs
 
 ```{r resamps}
-set.seed(2025)
+
+pdf(
+  here::here("Figures/figure_8.pdf"),
+  width = 10,
+  height = 7
+  )
+
+set.seed(56)
+resamp = resamples(list(
+  lm = lm_fit,
+  enet = enet_fit,
+  pls = pls_fit,
+  gam = gam_fit,
+  mars = mars_fit
+))
+
+bwplot(resamp, metric = "RMSE") 
+
+dev.off()
+
+```
+
+```{r}
+
+pdf(
+  here::here("Figures/figure_9.pdf"),
+  width = 10,
+  height = 7
+  )
+
+set.seed(56)
 resamp = resamples(list(
   lm = lm_fit,
   enet = enet_fit,
@@ -249,8 +350,10 @@ resamp = resamples(list(
 
 parallelplot(resamp, metric = "RMSE")
 
-bwplot(resamp, metric = "RMSE", main = "Figure 10: Comparing CV RMSEs") 
+dev.off()
+
 ```
+
 
 #### Test RMSE
 
