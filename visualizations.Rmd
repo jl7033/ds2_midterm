@@ -53,14 +53,21 @@ test_df = dat2 |> dplyr::select(-id)
 
 
 ```{r sum_stats}
+
 cont_pred = c("age", "height", "weight", "bmi", "SBP", "LDL", "time")
 cat_pred = c("gender", "race", "smoking", "diabetes", "hypertension")
 # Table 1
 cat_table = dat1 |> 
   tbl_summary(include = c(gender, race, smoking, diabetes, hypertension)) |> 
-  modify_caption("Table 1. Patient Categorical Characteristics")|> 
   bold_labels()
 cat_table |> as_flex_table()
+
+dev.off()
+
+```
+
+```{r}
+
 # Table 2
 cont_table = dat1 |> 
   tbl_summary(include = c(age, height, weight, bmi, SBP, LDL, time),
@@ -68,19 +75,25 @@ cont_table = dat1 |>
               statistic = all_continuous() ~ c("{median} ({p25}, {p75})",
                                               "{min}, {max}")
               ) |> 
-  modify_caption("Table 2. Patient Continuous Characteristics") |> 
   bold_labels()
 cont_table |> as_flex_table()
+
+```
+
+
+```{r}
+
 # Table 3
 outcome_table = dat1 |> 
   tbl_summary(include = log_antibody,
               type = all_continuous() ~ "continuous2",
               statistic = all_continuous() ~ c("{median} ({p25}, {p75})",
                                               "{min}, {max}")) |> 
-  modify_caption("Table 3. Log-Antibody Level Characteristics") |> 
   bold_labels()
 outcome_table|> as_flex_table()
+
 ```
+
 
 ```{r response_dist}
 
@@ -353,7 +366,6 @@ parallelplot(resamp, metric = "RMSE")
 dev.off()
 
 ```
-
 
 #### Test RMSE
 
