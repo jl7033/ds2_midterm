@@ -284,6 +284,21 @@ MSPE_mars
 
 ```
 
+### PDPs
+
+```{r}
+
+p1 <- pdp::partial(mars_fit, pred.var = c("bmi"), grid.resolution = 10) |> autoplot()
+
+p2 <- pdp::partial(mars_fit, pred.var = c("bmi", "time"),
+grid.resolution = 10) |>
+pdp::plotPartial(levelplot = FALSE, zlab = "yhat", drape = TRUE,
+screen = list(z = 20, x = -60))
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+```
+
+
 # Comparing Different Models
 
 ```{r}
