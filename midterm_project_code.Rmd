@@ -2,10 +2,13 @@
 title: "Appendix"
 author: "Joe LaRocca, Brooklynn McNeil, Malika Top"
 date: "2025-03-31"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 header-includes:
-  - \usepackage{float}
-  - \floatplacement{figure}{H}
+- \usepackage{float}
+- \floatplacement{figure}{H}
 ---
 
 ```{r setup, include=FALSE}
@@ -35,7 +38,7 @@ load("./dat1.RData")
 load("./dat2.RData")
 # split dat1 into a train and test dataset
 
-dat1 = dat1 |> 
+dat_tables = dat1 |> 
   dplyr::select(-id) |> 
   mutate(gender = factor(gender, levels = c(0, 1), labels = c("female", "male")),
          race = factor(race, levels = c(1, 2, 3, 4), labels = c("white", "asian", 
@@ -47,7 +50,7 @@ dat1 = dat1 |>
          hypertension = factor(hypertension, levels = c(0, 1), labels = c("no", "yes")))
 
 #colSums(is.na(dat1))
-train_df = dat1 
+train_df = dat1 |> dplyr::select(-id)
 test_df = dat2 |> dplyr::select(-id)
 ```
 
@@ -57,19 +60,17 @@ test_df = dat2 |> dplyr::select(-id)
 cont_pred = c("age", "height", "weight", "bmi", "SBP", "LDL", "time")
 cat_pred = c("gender", "race", "smoking", "diabetes", "hypertension")
 # Table 1
-cat_table = dat1 |> 
+cat_table = dat_tables |> 
   tbl_summary(include = c(gender, race, smoking, diabetes, hypertension)) |> 
   bold_labels()
 cat_table |> as_flex_table()
-
-dev.off()
 
 ```
 
 ```{r}
 
 # Table 2
-cont_table = dat1 |> 
+cont_table = dat_tables |> 
   tbl_summary(include = c(age, height, weight, bmi, SBP, LDL, time),
               type = all_continuous() ~ "continuous2",
               statistic = all_continuous() ~ c("{median} ({p25}, {p75})",
@@ -84,7 +85,7 @@ cont_table |> as_flex_table()
 ```{r}
 
 # Table 3
-outcome_table = dat1 |> 
+outcome_table = dat_tables |> 
   tbl_summary(include = log_antibody,
               type = all_continuous() ~ "continuous2",
               statistic = all_continuous() ~ c("{median} ({p25}, {p75})",
@@ -97,12 +98,6 @@ outcome_table|> as_flex_table()
 
 ```{r response_dist}
 
-pdf(
-  here::here("Figures/figure_1.pdf"),
-  width = 10,
-  height = 7
-  )
-
 # Fig. 1
 dat1 |>
   ggplot(aes(x = log_antibody)) +
@@ -112,22 +107,14 @@ dat1 |>
        x = "Log Antibody Levels",
        y = "Frequency") 
 
-dev.off()
-
 ```
 
 ```{r pred_dist}
 
-pdf(
-  here::here("Figures/figure_2.pdf"),
-  width = 10,
-  height = 7
-  )
-
 # Fig. 2
 barplots = list()
 for (pred in cat_pred) {
-  plot = ggplot(dat1, aes(x = .data[[pred]], fill = .data[[pred]])) +
+  plot = ggplot(dat_tables, aes(x = .data[[pred]], fill = .data[[pred]])) +
   geom_bar() +
   labs(title = paste("Distribution of", pred)) +
   theme(plot.title = element_text(size = 10, hjust = 0.5, margin = margin(b = 10)),
@@ -138,17 +125,10 @@ for (pred in cat_pred) {
 
 wrap_plots(barplots) + plot_annotation(title = "Figure 2")
 
-dev.off()
 ```
 
 
 ```{r histograms}
-
-pdf(
-  here::here("Figures/figure_3.pdf"),
-  width = 10,
-  height = 7
-  )
 
 # Fig. 3
 histograms = list()
@@ -164,24 +144,15 @@ for (pred in cont_pred) {
 
 wrap_plots(histograms) 
 
-dev.off()
-
 ```
  
 
-
 ```{r boxplots}
-
-pdf(
-  here::here("Figures/figure_4.pdf"),
-  width = 10,
-  height = 7
-  )
 
 # Fig. 4
 boxplots = list()
 for (pred in cat_pred) {
-  plot = ggplot(dat1, aes(x = .data[[pred]], y = log_antibody, fill = .data[[pred]])) +
+  plot = ggplot(dat_tables, aes(x = .data[[pred]], y = log_antibody, fill = .data[[pred]])) +
   geom_boxplot() +
   theme(plot.title = element_text(size = 10, hjust = 0.5, margin = margin(b = 10)),
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
@@ -190,16 +161,9 @@ for (pred in cat_pred) {
 }
 wrap_plots(boxplots) 
 
-dev.off()
 ```
 
 ```{r scatterplots}
-
-pdf(
-  here::here("Figures/figure_5.pdf"),
-  width = 10,
-  height = 7
-  )
 
 # Fig. 5
 scatter_plots = list()
@@ -215,24 +179,14 @@ for (pred in cont_pred) {
 }
 wrap_plots(scatter_plots) 
 
-dev.off()
-
 ```
 
 ```{r corrplots, fig.width=6, fig.height=6}
-
-pdf(
-  here::here("Figures/figure_6.pdf"),
-  width = 10,
-  height = 7
-  )
 
 # Fig. 6
 x = model.matrix(log_antibody ~ ., dat1)[,-1]
 y = dat1$log_antibody
 corrplot::corrplot(cor(x), method = "circle", type = "full")
-
-dev.off()
 
 ```
 
@@ -287,12 +241,6 @@ gam_fit$finalModel
 #### MARS
 ```{r mars}
 
-pdf(
-  here::here("Figures/figure_7.pdf"),
-  width = 10,
-  height = 7
-  )
-
 set.seed(56)
 
 mars_grid <- expand.grid(degree = 1:3,nprune = 2:15)
@@ -303,8 +251,6 @@ mars_fit = train(log_antibody ~ .,
                tuneGrid = mars_grid,
                trControl = ctrl1)
 ggplot(mars_fit) 
-
-dev.off()
 
 ```
 #### Linear regression
@@ -323,12 +269,6 @@ summary(lm_fit)
 
 ```{r resamps}
 
-pdf(
-  here::here("Figures/figure_8.pdf"),
-  width = 10,
-  height = 7
-  )
-
 set.seed(56)
 resamp = resamples(list(
   lm = lm_fit,
@@ -340,19 +280,11 @@ resamp = resamples(list(
 
 bwplot(resamp, metric = "RMSE") 
 
-dev.off()
-
 ```
 
 #### Partial Dependence Plots
 
 ```{r}
-
-pdf(
-  here::here("Figures/figure_9.pdf"),
-  width = 10,
-  height = 7
-  )
 
 p1 <- pdp::partial(mars_fit, pred.var = c("bmi"), grid.resolution = 10) |> autoplot()
 
@@ -362,10 +294,7 @@ pdp::plotPartial(levelplot = FALSE, zlab = "yhat", drape = TRUE,
 screen = list(z = 20, x = -60))
 gridExtra::grid.arrange(p1, p2, ncol = 2)
 
-dev.off()
-
 ```
-
 
 #### Test RMSE
 
